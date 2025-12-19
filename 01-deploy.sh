@@ -104,17 +104,7 @@ if [[ ! -f "lambda-function/target/lambda-function-1.0.0.jar" ]]; then
 fi
 echo -e "${GREEN}✓ lambda-function-1.0.0.jar created${NC}"
 
-if [[ ! -f "lambda-layer-dependencies/target/lambda-layer-dependencies-1.0.0-lambda-layer.zip" ]]; then
-    echo -e "${RED}Error: dependencies layer ZIP not found${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ lambda-layer-dependencies-1.0.0-lambda-layer.zip created${NC}"
 
-if [[ ! -f "lambda-layer-shared/target/lambda-layer-shared-1.0.0-lambda-layer.zip" ]]; then
-    echo -e "${RED}Error: shared layer ZIP not found${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ lambda-layer-shared-1.0.0-lambda-layer.zip created${NC}"
 
 echo ""
 

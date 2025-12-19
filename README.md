@@ -31,7 +31,7 @@ terraform -chdir=ldc-loan-review-workflow/terraform apply -auto-approve
 ### Test
 
 ```bash
-./test-deployment.sh
+./02-test-deployment.sh
 ```
 
 ## Architecture
@@ -210,29 +210,24 @@ PARAMETER_STORE_PREFIX=/ldc-workflow
 
 ```
 ldc-loan-review-workflow/
-├── lambda-function/                    # Lambda function code
+├── lambda-function/                    # Lambda function code (Includes all handlers, services, and types)
 │   ├── src/main/java/com/ldc/workflow/
 │   │   ├── handlers/                   # 11 Lambda handlers
 │   │   ├── config/                     # AWS client configuration
-│   │   └── LambdaApplication.java      # Spring Boot entry point
-│   └── pom.xml
-├── lambda-layer-dependencies/          # Spring Boot + AWS SDK dependencies
-│   └── pom.xml
-├── lambda-layer-shared/                # Shared types and services
-│   ├── src/main/java/com/ldc/workflow/
 │   │   ├── types/                      # WorkflowState, LoanAttribute
 │   │   ├── service/                    # Services (Config, Email, Audit, etc.)
 │   │   ├── repository/                 # DynamoDB repository
-│   │   └── validation/                 # Validators
+│   │   ├── validation/                 # Validators
+│   │   └── LambdaApplication.java      # Spring Boot entry point
 │   └── pom.xml
 ├── terraform/                          # Infrastructure as Code
 │   ├── main.tf                         # Root configuration
 │   ├── modules/                        # Terraform modules
 │   ├── terraform.tfvars                # Environment variables
 │   └── outputs.tf                      # Output values
-├── test-deployment.sh                  # Main verification script
-├── resume-executions.sh                # Resume paused workflows
-├── deploy.sh                           # Deployment automation
+├── 02-test-deployment.sh               # Main verification script
+├── 05-resume-executions.sh             # Resume paused workflows
+├── 01-deploy.sh                        # Deployment automation
 ├── pom.xml                             # Parent POM
 └── README.md                           # This file
 ```
@@ -240,20 +235,14 @@ ldc-loan-review-workflow/
 ## Build & Deployment
 
 ### Local Build
-
 ```bash
-# Build all modules
-mvn clean package -DskipTests -f ldc-loan-review-workflow/pom.xml
-
-# Build specific module
+# Build the project
 mvn clean package -DskipTests -f ldc-loan-review-workflow/lambda-function/pom.xml
 ```
 
 ### Build Artifacts
 
 - **Lambda Function JAR**: `lambda-function/target/lambda-function-1.0.0.jar` (41 KB)
-- **Shared Layer ZIP**: `lambda-layer-shared/target/lambda-layer-shared-1.0.0-lambda-layer.zip` (28 MB)
-- **Dependencies Layer ZIP**: `lambda-layer-dependencies/target/lambda-layer-dependencies-1.0.0-lambda-layer.zip` (34 MB)
 
 ### AWS Deployment
 
@@ -287,13 +276,13 @@ aws lambda update-function-configuration \
 The project includes several shell scripts to automate build, deployment, and testing tasks:
 
 ### Core Scripts
-- **`deploy.sh`**: The main deployment automation script.
-  - Usage: `./deploy.sh [dev|staging|prod]`
+- **`01-deploy.sh`**: The main deployment automation script.
+  - Usage: `./01-deploy.sh [dev|staging|prod]`
   - Actions: Checks dependencies (Java, Maven, Terraform, AWS CLI), builds the Maven project (JARs + Layers), initializes Terraform, and applies the infrastructure configuration.
 
 ### Verification & Testing
-- **`test-deployment.sh`**: The primary post-deployment verification script.
-  - Usage: `./test-deployment.sh`
+- **`02-test-deployment.sh`**: The primary post-deployment verification script.
+  - Usage: `./02-test-deployment.sh`
   - Actions: 
     1. Checks Lambda function health.
     2. Invokes key Lambda handlers directly (Validation, Status, Completion) to verify logic.
@@ -301,15 +290,15 @@ The project includes several shell scripts to automate build, deployment, and te
     4. Starts workflows for "Approved", "Repurchase", and "Reclass" scenarios.
     5. Verifies DynamoDB table counts and CloudWatch Log groups.
 
-- **`resume-executions.sh`**: Helper script to unblock paused workflows.
-  - Usage: `./resume-executions.sh`
+- **`05-resume-executions.sh`**: Helper script to unblock paused workflows.
+  - Usage: `./05-resume-executions.sh`
   - Actions: Polls the SQS queue (`ldc-loan-review-reclass-confirmations`) for "Wait for Callback" tokens and sends a Success signal to Step Functions to resume execution. Useful for "Reclass" or "Manual Review" test scenarios.
 
-- **`test-step-functions.sh`**: Dedicated Step Functions logic tester.
-  - Usage: `./test-step-functions.sh`
+- **`04-test-step-functions.sh`**: Dedicated Step Functions logic tester.
+  - Usage: `./04-test-step-functions.sh`
   - Actions: Starts executions for various business logic paths (Happy Path, Invalid Type, SecPolicy, Conduit) and polls for completion status.
 
-- **`test-aws-deployment.sh`**: Lightweight handler tester.
+- **`03-test-aws-deployment.sh`**: Lightweight handler tester.
   - Actions: Invokes Lambda handlers with specific payloads to verify individual component logic in isolation.
 
 ## Testing
@@ -317,7 +306,7 @@ The project includes several shell scripts to automate build, deployment, and te
 ### Run Step Functions Tests
 
 ```bash
-./ldc-loan-review-workflow/test-step-functions.sh
+./ldc-loan-review-workflow/04-test-step-functions.sh
 ```
 
 ### Test Results
