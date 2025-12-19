@@ -220,6 +220,7 @@ PAYLOAD=$(cat <<EOF
   "reviewType": "LDCReview",
   "currentAssignedUsername": "testuser",
   "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "dynamoDbTableName": "$DYNAMODB_TABLE_NAME",
   "attributes": [
     {"attributeName": "CreditScore", "attributeDecision": "Pending"}
   ],

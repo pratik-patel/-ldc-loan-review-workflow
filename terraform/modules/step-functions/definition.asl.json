@@ -152,7 +152,8 @@
           "loanNumber.$": "$.loanNumber",
           "loanDecision.$": "$.loanDecisionResult.loanDecision",
           "attributes.$": "$.loanDecisionResult.attributes",
-          "executionId.$": "$.executionId"
+          "executionId.$": "$.executionId",
+          "dynamoDbTableName.$": "$.dynamoDbTableName"
         }
       },
       "ResultPath": "$.statusResult",
@@ -215,7 +216,8 @@
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
           "loanDecision.$": "$.loanDecisionResult.loanDecision",
-          "loanStatus.$": "$.statusResult.Payload.status"
+          "loanStatus.$": "$.statusResult.Payload.status",
+          "dynamoDbTableName.$": "$.dynamoDbTableName"
         }
       },
       "ResultPath": "$.vendPpaResult",
@@ -255,7 +257,8 @@
           "notificationType": "Repurchase",
           "loanNumber.$": "$.loanNumber",
           "requestNumber.$": "$.requestNumber",
-          "templateName": "repurchase"
+          "templateName": "repurchase",
+          "dynamoDbTableName.$": "$.dynamoDbTableName"
         }
       },
       "ResultPath": "$.emailResult",
@@ -331,7 +334,8 @@
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
           "loanDecision.$": "$.loanDecisionResult.loanDecision",
-          "attributes.$": "$.loanDecisionResult.attributes"
+          "attributes.$": "$.loanDecisionResult.attributes",
+          "dynamoDbTableName.$": "$.dynamoDbTableName"
         }
       },
       "ResultPath": "$.sqsResult",
@@ -355,7 +359,8 @@
           "notificationType": "ReclassExpired",
           "loanNumber.$": "$.loanNumber",
           "requestNumber.$": "$.requestNumber",
-          "templateName": "reclass-expired"
+          "templateName": "reclass-expired",
+          "dynamoDbTableName.$": "$.dynamoDbTableName"
         }
       },
       "ResultPath": "$.emailResult",
@@ -379,7 +384,8 @@
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
           "executionId.$": "$.executionId",
-          "stateChange": "WorkflowCompleted"
+          "stateChange": "WorkflowCompleted",
+          "dynamoDbTableName.$": "$.dynamoDbTableName"
         }
       },
       "ResultPath": "$.auditResult",
