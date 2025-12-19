@@ -20,7 +20,9 @@
       "Next": "CheckReviewTypeValid",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "ReviewTypeValidationError"
         }
       ]
@@ -58,7 +60,9 @@
       "TimeoutSeconds": 86400,
       "Catch": [
         {
-          "ErrorEquals": ["States.TaskStateAborted"],
+          "ErrorEquals": [
+            "States.TaskStateAborted"
+          ],
           "Next": "ReviewTypeAssignmentAborted"
         }
       ]
@@ -85,7 +89,9 @@
       "TimeoutSeconds": 604800,
       "Catch": [
         {
-          "ErrorEquals": ["States.TaskStateAborted"],
+          "ErrorEquals": [
+            "States.TaskStateAborted"
+          ],
           "Next": "LoanDecisionAborted"
         }
       ]
@@ -104,15 +110,17 @@
           "handlerType": "completionCriteria",
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
-          "loanDecision.$": "$.loanDecision",
-          "attributes.$": "$.attributes"
+          "loanDecision.$": "$.loanDecisionResult.loanDecision",
+          "attributes.$": "$.loanDecisionResult.attributes"
         }
       },
       "ResultPath": "$.completionResult",
       "Next": "IsLoanDecisionComplete",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "CompletionCheckError"
         }
       ]
@@ -142,15 +150,21 @@
           "handlerType": "loanStatusDetermination",
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
-          "loanDecision.$": "$.loanDecision",
-          "attributes.$": "$.attributes"
+          "loanDecision.$": "$.loanDecisionResult.loanDecision",
+          "attributes.$": "$.loanDecisionResult.attributes",
+          "executionId.$": "$.executionId"
         }
       },
       "ResultPath": "$.statusResult",
+      "ResultSelector": {
+        "Payload.$": "$.Payload"
+      },
       "Next": "RouteLoanDecision",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "StatusDeterminationError"
         }
       ]
@@ -200,7 +214,7 @@
           "handlerType": "vendPpaIntegration",
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
-          "loanDecision.$": "$.loanDecision",
+          "loanDecision.$": "$.loanDecisionResult.loanDecision",
           "loanStatus.$": "$.statusResult.Payload.status"
         }
       },
@@ -208,7 +222,9 @@
       "Next": "CheckVendPpaSuccess",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "VendPpaError"
         }
       ]
@@ -243,17 +259,19 @@
         }
       },
       "ResultPath": "$.emailResult",
-      "Next": "LogAuditTrail",
+      "Next": "CallVendPpa",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "LogAuditTrail"
         }
       ]
     },
     "StartReclassTimer": {
       "Type": "Wait",
-      "Seconds": 172800,
+      "Seconds": ${reclass_timer_seconds},
       "Next": "CheckReclassConfirmation"
     },
     "CheckReclassConfirmation": {
@@ -274,12 +292,25 @@
       "Next": "IsReclassConfirmed",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "SendReclassExpirationEmail"
         }
       ]
     },
     "IsReclassConfirmed": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.reclassCheckResult.Item",
+          "IsPresent": true,
+          "Next": "CheckReclassConfirmedValue"
+        }
+      ],
+      "Default": "SendReclassExpirationEmail"
+    },
+    "CheckReclassConfirmedValue": {
       "Type": "Choice",
       "Choices": [
         {
@@ -299,15 +330,17 @@
           "handlerType": "sqsHandler",
           "requestNumber.$": "$.requestNumber",
           "loanNumber.$": "$.loanNumber",
-          "loanDecision.$": "$.loanDecision",
-          "attributes.$": "$.attributes"
+          "loanDecision.$": "$.loanDecisionResult.loanDecision",
+          "attributes.$": "$.loanDecisionResult.attributes"
         }
       },
       "ResultPath": "$.sqsResult",
-      "Next": "LogAuditTrail",
+      "Next": "CallVendPpa",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "LogAuditTrail"
         }
       ]
@@ -329,7 +362,9 @@
       "Next": "LogAuditTrail",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "LogAuditTrail"
         }
       ]
@@ -351,7 +386,9 @@
       "Next": "WorkflowComplete",
       "Catch": [
         {
-          "ErrorEquals": ["States.ALL"],
+          "ErrorEquals": [
+            "States.ALL"
+          ],
           "Next": "WorkflowComplete"
         }
       ]

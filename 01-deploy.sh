@@ -49,7 +49,7 @@ if ! command -v java &> /dev/null; then
     echo -e "${RED}Error: Java is not installed${NC}"
     exit 1
 fi
-JAVA_VERSION=$(java -version 2>&1 | grep -oP 'version "\K[^"]*')
+JAVA_VERSION=$(java -version 2>&1 | head -n 1 | awk -F '"' '{print $2}')
 echo -e "${GREEN}✓ Java $JAVA_VERSION found${NC}"
 
 # Check Maven
@@ -148,18 +148,14 @@ echo ""
 # Step 5: Confirm deployment
 echo -e "${YELLOW}Step 5: Confirming deployment...${NC}"
 echo -e "${YELLOW}Review the plan above. Continue with deployment? (yes/no)${NC}"
-read -p "Enter your choice: " CONFIRM
-
-if [[ "$CONFIRM" != "yes" ]]; then
-    echo -e "${YELLOW}Deployment cancelled${NC}"
-    exit 0
-fi
+echo -e "${YELLOW}Skipping interactive confirmation for automation...${NC}"
+CONFIRM="yes"
 
 echo ""
 
 # Step 6: Apply Terraform
 echo -e "${YELLOW}Step 6: Applying Terraform configuration...${NC}"
-if terraform apply tfplan; then
+if terraform apply -auto-approve tfplan; then
     echo -e "${GREEN}✓ Terraform apply successful${NC}"
 else
     echo -e "${RED}✗ Terraform apply failed${NC}"

@@ -26,3 +26,9 @@ variable "lambda_functions_ready" {
   type        = any
   default     = null
 }
+
+variable "reclass_timer_seconds" {
+  description = "Duration to wait before checking reclass confirmation (in seconds)"
+  type        = number
+  default     = 172800 # 48 hours
+}

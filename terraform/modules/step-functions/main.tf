@@ -9,7 +9,9 @@ terraform {
 
 # Read the Step Functions definition
 locals {
-  state_machine_definition = file("${path.module}/definition.asl.json")
+  state_machine_definition = templatefile("${path.module}/definition.asl.json", {
+    reclass_timer_seconds = var.reclass_timer_seconds
+  })
 }
 
 # Step Functions State Machine

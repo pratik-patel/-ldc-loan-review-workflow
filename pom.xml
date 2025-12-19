@@ -37,7 +37,6 @@
     </properties>
 
     <modules>
-        <module>lambda-layer-dependencies</module>
         <module>lambda-function</module>
         <module>terraform</module>
     </modules>

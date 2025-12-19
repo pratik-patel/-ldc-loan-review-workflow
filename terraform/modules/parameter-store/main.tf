@@ -7,59 +7,273 @@ terraform {
   }
 }
 
-# Email Templates
-resource "aws_ssm_parameter" "email_template_repurchase" {
-  name  = "/ldc-workflow/email-templates/repurchase"
-  type  = "String"
-  value = var.email_templates["repurchase"].body
-
+# Timing Parameters
+resource "aws_ssm_parameter" "reclass_timer_seconds" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/timing/reclass_timer_seconds"
+  description = "Duration to wait before checking reclass confirmation (in seconds)"
+  type        = "String"
+  value       = var.reclass_timer_seconds
   tags = {
-    Name        = "repurchase-email-template"
+    Category    = "Timing"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "review_type_assignment_timeout" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/timing/review_type_assignment_timeout_seconds"
+  description = "Timeout for review type assignment stage (in seconds)"
+  type        = "String"
+  value       = var.review_type_assignment_timeout_seconds
+  tags = {
+    Category    = "Timing"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "loan_decision_timeout" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/timing/loan_decision_timeout_seconds"
+  description = "Timeout for loan decision stage (in seconds)"
+  type        = "String"
+  value       = var.loan_decision_timeout_seconds
+  tags = {
+    Category    = "Timing"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "max_reclass_attempts" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/timing/max_reclass_attempts"
+  description = "Maximum number of reclass attempts allowed"
+  type        = "String"
+  value       = var.max_reclass_attempts
+  tags = {
+    Category    = "Timing"
+    Environment = var.environment
+  }
+}
+
+# Email Configuration - Templates
+resource "aws_ssm_parameter" "email_template_repurchase" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/email/templates/repurchase"
+  description = "Email template for repurchase notifications"
+  type        = "String"
+  value       = jsonencode(var.email_templates.repurchase)
+  tags = {
+    Category    = "Email"
     Environment = var.environment
   }
 }
 
 resource "aws_ssm_parameter" "email_template_reclass_expired" {
-  name  = "/ldc-workflow/email-templates/reclass-expired"
-  type  = "String"
-  value = var.email_templates["reclass_expired"].body
-
+  name        = "/${var.parameter_store_prefix}/${var.environment}/email/templates/reclass_expired"
+  description = "Email template for reclass expiration notifications"
+  type        = "String"
+  value       = jsonencode(var.email_templates.reclass_expired)
   tags = {
-    Name        = "reclass-expired-email-template"
+    Category    = "Email"
     Environment = var.environment
   }
 }
 
-# Notification Emails
-resource "aws_ssm_parameter" "notification_email_repurchase" {
-  name  = "/ldc-workflow/notifications/repurchase-email"
-  type  = "String"
-  value = var.notification_emails["repurchase"]
-
+resource "aws_ssm_parameter" "email_template_review_type_assignment" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/email/templates/review_type_assignment"
+  description = "Email template for review type assignment notifications"
+  type        = "String"
+  value       = jsonencode(var.email_templates.review_type_assignment)
   tags = {
-    Name        = "repurchase-notification-email"
+    Category    = "Email"
     Environment = var.environment
   }
 }
 
-resource "aws_ssm_parameter" "notification_email_reclass" {
-  name  = "/ldc-workflow/notifications/reclass-email"
-  type  = "String"
-  value = var.notification_emails["reclass"]
-
+# Email Configuration - Recipients
+resource "aws_ssm_parameter" "email_repurchase_team" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/email/recipients/repurchase_team"
+  description = "Email address for repurchase team notifications"
+  type        = "String"
+  value       = var.notification_emails.repurchase_team
   tags = {
-    Name        = "reclass-notification-email"
+    Category    = "Email"
     Environment = var.environment
   }
 }
 
-# Outputs
-output "email_template_repurchase_name" {
-  value       = aws_ssm_parameter.email_template_repurchase.name
-  description = "Parameter Store name for repurchase email template"
+resource "aws_ssm_parameter" "email_reclass_team" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/email/recipients/reclass_team"
+  description = "Email address for reclass team notifications"
+  type        = "String"
+  value       = var.notification_emails.reclass_team
+  tags = {
+    Category    = "Email"
+    Environment = var.environment
+  }
 }
 
-output "email_template_reclass_expired_name" {
-  value       = aws_ssm_parameter.email_template_reclass_expired.name
-  description = "Parameter Store name for reclass expired email template"
+resource "aws_ssm_parameter" "email_admin" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/email/recipients/admin"
+  description = "Email address for admin notifications"
+  type        = "String"
+  value       = var.notification_emails.admin
+  tags = {
+    Category    = "Email"
+    Environment = var.environment
+  }
+}
+
+# API & Integration Endpoints
+resource "aws_ssm_parameter" "vend_ppa_api_endpoint" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/api/vend_ppa_endpoint"
+  description = "Vend PPA API endpoint URL"
+  type        = "String"
+  value       = var.api_endpoints.vend_ppa_endpoint
+  tags = {
+    Category    = "API"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "vend_ppa_api_timeout" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/api/vend_ppa_timeout_seconds"
+  description = "Vend PPA API timeout in seconds"
+  type        = "String"
+  value       = var.api_endpoints.vend_ppa_timeout_seconds
+  tags = {
+    Category    = "API"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "vend_ppa_retry_attempts" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/api/vend_ppa_retry_attempts"
+  description = "Number of retry attempts for Vend PPA API calls"
+  type        = "String"
+  value       = var.api_endpoints.vend_ppa_retry_attempts
+  tags = {
+    Category    = "API"
+    Environment = var.environment
+  }
+}
+
+# Business Rules
+resource "aws_ssm_parameter" "allowed_review_types" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/business_rules/allowed_review_types"
+  description = "JSON list of allowed review types"
+  type        = "String"
+  value       = jsonencode(var.business_rules.allowed_review_types)
+  tags = {
+    Category    = "BusinessRules"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "allowed_attribute_decisions" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/business_rules/allowed_attribute_decisions"
+  description = "JSON list of allowed attribute decision values"
+  type        = "String"
+  value       = jsonencode(var.business_rules.allowed_attribute_decisions)
+  tags = {
+    Category    = "BusinessRules"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "credit_score_threshold" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/business_rules/credit_score_threshold"
+  description = "Minimum credit score for approval"
+  type        = "String"
+  value       = var.business_rules.credit_score_threshold
+  tags = {
+    Category    = "BusinessRules"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "debt_ratio_threshold" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/business_rules/debt_ratio_threshold"
+  description = "Maximum debt ratio for approval"
+  type        = "String"
+  value       = var.business_rules.debt_ratio_threshold
+  tags = {
+    Category    = "BusinessRules"
+    Environment = var.environment
+  }
+}
+
+# Feature Flags
+resource "aws_ssm_parameter" "enable_vend_ppa_integration" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/feature_flags/enable_vend_ppa_integration"
+  description = "Enable/disable Vend PPA integration"
+  type        = "String"
+  value       = var.feature_flags.enable_vend_ppa_integration
+  tags = {
+    Category    = "FeatureFlags"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "enable_email_notifications" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/feature_flags/enable_email_notifications"
+  description = "Enable/disable email notifications"
+  type        = "String"
+  value       = var.feature_flags.enable_email_notifications
+  tags = {
+    Category    = "FeatureFlags"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "enable_audit_logging" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/feature_flags/enable_audit_logging"
+  description = "Enable/disable detailed audit logging"
+  type        = "String"
+  value       = var.feature_flags.enable_audit_logging
+  tags = {
+    Category    = "FeatureFlags"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "reclass_feature_enabled" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/feature_flags/reclass_feature_enabled"
+  description = "Enable/disable reclass workflow"
+  type        = "String"
+  value       = var.feature_flags.reclass_feature_enabled
+  tags = {
+    Category    = "FeatureFlags"
+    Environment = var.environment
+  }
+}
+
+# Monitoring & Logging
+resource "aws_ssm_parameter" "log_level" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/logging/log_level"
+  description = "Application log level (DEBUG, INFO, WARN, ERROR)"
+  type        = "String"
+  value       = var.logging.log_level
+  tags = {
+    Category    = "Logging"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "enable_detailed_logging" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/logging/enable_detailed_logging"
+  description = "Enable verbose logging for troubleshooting"
+  type        = "String"
+  value       = var.logging.enable_detailed_logging
+  tags = {
+    Category    = "Logging"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "cloudwatch_metric_namespace" {
+  name        = "/${var.parameter_store_prefix}/${var.environment}/logging/cloudwatch_metric_namespace"
+  description = "CloudWatch custom metrics namespace"
+  type        = "String"
+  value       = var.logging.cloudwatch_metric_namespace
+  tags = {
+    Category    = "Logging"
+    Environment = var.environment
+  }
 }

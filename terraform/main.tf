@@ -91,6 +91,8 @@ module "lambda" {
     SNS_TOPIC_ARN       = module.sns.topic_arn
     SES_SENDER_EMAIL    = var.ses_sender_email
     PARAMETER_STORE_PREFIX = "/ldc-workflow"
+    SPRING_CLOUD_FUNCTION_DEFINITION = "loanReviewRouter"
+    MAIN_CLASS = "com.ldc.workflow.LambdaApplication"
   }
 }
 
@@ -104,6 +106,8 @@ module "step_functions" {
   log_retention_days = var.cloudwatch_log_retention_days
   
   lambda_functions_ready = module.lambda.function_arn
+  
+  reclass_timer_seconds = 5 # Override for Dev/Test
 }
 
 # CloudWatch Logs
@@ -122,8 +126,28 @@ module "cloudwatch" {
 module "parameter_store" {
   source = "./modules/parameter-store"
 
-  environment = var.environment
+  parameter_store_prefix = var.parameter_store_prefix
+  environment            = var.environment
   
-  email_templates = var.email_templates
+  # Timing
+  reclass_timer_seconds                = var.reclass_timer_seconds
+  review_type_assignment_timeout_seconds = var.review_type_assignment_timeout_seconds
+  loan_decision_timeout_seconds        = var.loan_decision_timeout_seconds
+  max_reclass_attempts                 = var.max_reclass_attempts
+  
+  # Email
+  email_templates     = var.email_templates
   notification_emails = var.notification_emails
+  
+  # API & Integration
+  api_endpoints = var.api_endpoints
+  
+  # Business Rules
+  business_rules = var.business_rules
+  
+  # Feature Flags
+  feature_flags = var.feature_flags
+  
+  # Logging
+  logging = var.logging
 }

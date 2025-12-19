@@ -7,6 +7,11 @@ set -e
 
 STATE_MACHINE_ARN="arn:aws:states:us-east-1:851725256415:stateMachine:ldc-loan-review-workflow"
 AWS_REGION="us-east-1"
+PAUSE_QUEUE_URL=$(aws sqs list-queues --region "$AWS_REGION" --query "QueueUrls[?contains(@, 'ldc-loan-review-reclass-confirmations')]" --output text)
+DYNAMODB_TABLE_NAME=$(aws dynamodb list-tables --region "$AWS_REGION" --query "TableNames[?contains(@, 'ldc-loan-review-state')]" --output text)
+
+echo "Using SQS Queue: $PAUSE_QUEUE_URL"
+echo "Using DynamoDB Table: $DYNAMODB_TABLE_NAME"
 
 echo "=========================================="
 echo "LDC Loan Review Workflow - Step Functions Test Suite"
@@ -22,10 +27,13 @@ PAYLOAD=$(cat <<EOF
   "loanNumber": "LOAN-HAPPY-001",
   "reviewType": "LDCReview",
   "currentAssignedUsername": "testuser",
+  "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "dynamoDbTableName": "$DYNAMODB_TABLE_NAME",
   "attributes": [
     {"attributeName": "CreditScore", "attributeDecision": "Pending"},
     {"attributeName": "DebtRatio", "attributeDecision": "Pending"}
-  ]
+  ],
+  "executionId": "$EXECUTION_NAME"
 }
 EOF
 )
@@ -72,7 +80,11 @@ PAYLOAD=$(cat <<EOF
   "requestNumber": "REQ-INVALID-001",
   "loanNumber": "LOAN-INVALID-001",
   "reviewType": "InvalidType",
-  "currentAssignedUsername": "testuser"
+  "currentAssignedUsername": "testuser",
+  "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "dynamoDbTableName": "$DYNAMODB_TABLE_NAME",
+  "attributes": [],
+  "executionId": "$EXECUTION_NAME"
 }
 EOF
 )
@@ -116,9 +128,12 @@ PAYLOAD=$(cat <<EOF
   "loanNumber": "LOAN-SECPOLICY-001",
   "reviewType": "SecPolicyReview",
   "currentAssignedUsername": "testuser",
+  "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "dynamoDbTableName": "$DYNAMODB_TABLE_NAME",
   "attributes": [
     {"attributeName": "ComplianceCheck", "attributeDecision": "Pending"}
-  ]
+  ],
+  "executionId": "$EXECUTION_NAME"
 }
 EOF
 )
@@ -158,9 +173,12 @@ PAYLOAD=$(cat <<EOF
   "loanNumber": "LOAN-CONDUIT-001",
   "reviewType": "ConduitReview",
   "currentAssignedUsername": "testuser",
+  "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "dynamoDbTableName": "$DYNAMODB_TABLE_NAME",
   "attributes": [
     {"attributeName": "ConduitCompliance", "attributeDecision": "Pending"}
-  ]
+  ],
+  "executionId": "$EXECUTION_NAME"
 }
 EOF
 )
@@ -180,6 +198,88 @@ if [ -n "$EXECUTION_ARN" ]; then
   sleep 3
   
   # Get execution history
+  HISTORY=$(aws stepfunctions get-execution-history \
+    --execution-arn "$EXECUTION_ARN" \
+    --region "$AWS_REGION" 2>&1)
+  
+  EVENT_COUNT=$(echo "$HISTORY" | grep -o '"type"' | wc -l)
+  echo "✓ Execution progressed with $EVENT_COUNT events"
+else
+  echo "⚠ Failed to start execution"
+fi
+echo ""
+
+
+# Test 5: Repurchase Request
+echo "Test 5: Repurchase Request"
+EXECUTION_NAME="test-repurchase-$(date +%s)"
+PAYLOAD=$(cat <<EOF
+{
+  "requestNumber": "REQ-REPURCHASE-001",
+  "loanNumber": "LOAN-REPURCHASE-001",
+  "reviewType": "LDCReview",
+  "currentAssignedUsername": "testuser",
+  "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "attributes": [
+    {"attributeName": "CreditScore", "attributeDecision": "Pending"}
+  ],
+  "executionId": "$EXECUTION_NAME"
+}
+EOF
+)
+
+EXECUTION_RESPONSE=$(aws stepfunctions start-execution \
+  --state-machine-arn "$STATE_MACHINE_ARN" \
+  --name "$EXECUTION_NAME" \
+  --input "$PAYLOAD" \
+  --region "$AWS_REGION" 2>&1)
+
+EXECUTION_ARN=$(echo "$EXECUTION_RESPONSE" | grep -o '"executionArn": "[^"]*' | cut -d'"' -f4)
+
+if [ -n "$EXECUTION_ARN" ]; then
+  echo "✓ Execution started: $EXECUTION_ARN"
+  sleep 3
+  HISTORY=$(aws stepfunctions get-execution-history \
+    --execution-arn "$EXECUTION_ARN" \
+    --region "$AWS_REGION" 2>&1)
+  
+  EVENT_COUNT=$(echo "$HISTORY" | grep -o '"type"' | wc -l)
+  echo "✓ Execution progressed with $EVENT_COUNT events"
+else
+  echo "⚠ Failed to start execution"
+fi
+echo ""
+
+# Test 6: Reclass Request
+echo "Test 6: Reclass Request"
+EXECUTION_NAME="test-reclass-$(date +%s)"
+PAYLOAD=$(cat <<EOF
+{
+  "requestNumber": "REQ-RECLASS-001",
+  "loanNumber": "LOAN-RECLASS-001",
+  "reviewType": "LDCReview",
+  "currentAssignedUsername": "testuser",
+  "pauseQueueUrl": "$PAUSE_QUEUE_URL",
+  "dynamoDbTableName": "$DYNAMODB_TABLE_NAME",
+  "attributes": [
+    {"attributeName": "CreditScore", "attributeDecision": "Pending"}
+  ],
+  "executionId": "$EXECUTION_NAME"
+}
+EOF
+)
+
+EXECUTION_RESPONSE=$(aws stepfunctions start-execution \
+  --state-machine-arn "$STATE_MACHINE_ARN" \
+  --name "$EXECUTION_NAME" \
+  --input "$PAYLOAD" \
+  --region "$AWS_REGION" 2>&1)
+
+EXECUTION_ARN=$(echo "$EXECUTION_RESPONSE" | grep -o '"executionArn": "[^"]*' | cut -d'"' -f4)
+
+if [ -n "$EXECUTION_ARN" ]; then
+  echo "✓ Execution started: $EXECUTION_ARN"
+  sleep 3
   HISTORY=$(aws stepfunctions get-execution-history \
     --execution-arn "$EXECUTION_ARN" \
     --region "$AWS_REGION" 2>&1)

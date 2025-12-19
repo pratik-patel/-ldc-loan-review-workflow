@@ -202,9 +202,64 @@ PARAMETER_STORE_PREFIX=/ldc-workflow
 ```
 
 ### Parameter Store Configuration
-- `/ldc-workflow/notification-email` - Recipient email for notifications
-- `/ldc-workflow/email-template/repurchase` - Repurchase email template
-- `/ldc-workflow/email-template/reclass-expired` - Reclass expiration email template
+
+All runtime configuration is managed through AWS Systems Manager Parameter Store, organized into 6 categories:
+
+#### Timing Parameters
+- `/ldc-workflow/{env}/timing/reclass_timer_seconds` - Wait before checking reclass confirmation
+- `/ldc-workflow/{env}/timing/review_type_assignment_timeout_seconds` - Review type assignment timeout
+- `/ldc-workflow/{env}/timing/loan_decision_timeout_seconds` - Loan decision timeout
+- `/ldc-workflow/{env}/timing/max_reclass_attempts` - Maximum reclass attempts
+
+#### Email Configuration
+**Templates (JSON):**
+- `/ldc-workflow/{env}/email/templates/repurchase` - Repurchase notification template
+- `/ldc-workflow/{env}/email/templates/reclass_expired` - Reclass expiration template
+- `/ldc-workflow/{env}/email/templates/review_type_assignment` - Review type assignment template
+
+**Recipients:**
+- `/ldc-workflow/{env}/email/recipients/repurchase_team` - Repurchase team email
+- `/ldc-workflow/{env}/email/recipients/reclass_team` - Reclass team email
+- `/ldc-workflow/{env}/email/recipients/admin` - Admin notification email
+
+#### API & Integration Endpoints
+- `/ldc-workflow/{env}/api/vend_ppa_endpoint` - Vend PPA API URL
+- `/ldc-workflow/{env}/api/vend_ppa_timeout_seconds` - API timeout
+- `/ldc-workflow/{env}/api/vend_ppa_retry_attempts` - Retry attempts
+
+#### Business Rules
+- `/ldc-workflow/{env}/business_rules/allowed_review_types` - JSON list of valid review types
+- `/ldc-workflow/{env}/business_rules/allowed_attribute_decisions` - JSON list of valid decisions
+- `/ldc-workflow/{env}/business_rules/credit_score_threshold` - Minimum credit score
+- `/ldc-workflow/{env}/business_rules/debt_ratio_threshold` - Maximum debt ratio
+
+#### Feature Flags
+- `/ldc-workflow/{env}/feature_flags/enable_vend_ppa_integration` - Toggle Vend PPA calls
+- `/ldc-workflow/{env}/feature_flags/enable_email_notifications` - Toggle email sending
+- `/ldc-workflow/{env}/feature_flags/enable_audit_logging` - Toggle audit trail
+- `/ldc-workflow/{env}/feature_flags/reclass_feature_enabled` - Toggle reclass workflow
+
+#### Logging & Monitoring
+- `/ldc-workflow/{env}/logging/log_level` - Application log level (DEBUG, INFO, WARN, ERROR)
+- `/ldc-workflow/{env}/logging/enable_detailed_logging` - Verbose logging flag
+- `/ldc-workflow/{env}/logging/cloudwatch_metric_namespace` - Custom metrics namespace
+
+#### Environment-Specific Defaults
+
+**Development** (Fast for testing):
+- Reclass timer: 5 seconds
+- Log level: DEBUG
+- Detailed logging: enabled
+
+**Staging** (Moderate):
+- Reclass timer: 5 minutes
+- Log level: INFO
+- Detailed logging: disabled
+
+**Production** (Full timers):
+- Reclass timer: 48 hours
+- Log level: WARN
+- Detailed logging: disabled
 
 ## Project Structure
 
@@ -230,6 +285,143 @@ ldc-loan-review-workflow/
 ├── 01-deploy.sh                        # Deployment automation
 ├── pom.xml                             # Parent POM
 └── README.md                           # This file
+```
+
+## Runtime Configuration Management
+
+### Deploy with Environment-Specific Configuration
+
+```bash
+cd terraform
+
+# Development
+terraform apply -var-file="environments/dev.tfvars"
+
+# Staging
+terraform apply -var-file="environments/staging.tfvars"
+
+# Production
+terraform apply -var-file="environments/prod.tfvars"
+```
+
+### Update Parameters at Runtime (No Redeployment)
+
+Update any parameter without redeploying code or infrastructure:
+
+```bash
+# Change reclass timer for testing
+aws ssm put-parameter \
+  --name "/ldc-workflow/dev/timing/reclass_timer_seconds" \
+  --value "10" \
+  --overwrite
+
+# Disable email notifications for maintenance
+aws ssm put-parameter \
+  --name "/ldc-workflow/prod/feature_flags/enable_email_notifications" \
+  --value "false" \
+  --overwrite
+
+# Update log level for troubleshooting
+aws ssm put-parameter \
+  --name "/ldc-workflow/prod/logging/log_level" \
+  --value "DEBUG" \
+  --overwrite
+
+# Update API endpoint
+aws ssm put-parameter \
+  --name "/ldc-workflow/prod/api/vend_ppa_endpoint" \
+  --value "https://new-api.vendppa.com/v1/loans" \
+  --overwrite
+```
+
+### Common Runtime Scenarios
+
+**Quick Testing in Dev:**
+```bash
+aws ssm put-parameter --name "/ldc-workflow/dev/timing/reclass_timer_seconds" --value "5" --overwrite
+aws ssm put-parameter --name "/ldc-workflow/dev/timing/review_type_assignment_timeout_seconds" --value "30" --overwrite
+```
+
+**Maintenance Window:**
+```bash
+# Disable integrations
+aws ssm put-parameter --name "/ldc-workflow/prod/feature_flags/enable_vend_ppa_integration" --value "false" --overwrite
+aws ssm put-parameter --name "/ldc-workflow/prod/feature_flags/enable_email_notifications" --value "false" --overwrite
+
+# Re-enable after maintenance
+aws ssm put-parameter --name "/ldc-workflow/prod/feature_flags/enable_vend_ppa_integration" --value "true" --overwrite
+aws ssm put-parameter --name "/ldc-workflow/prod/feature_flags/enable_email_notifications" --value "true" --overwrite
+```
+
+**Troubleshooting Production:**
+```bash
+# Enable verbose logging
+aws ssm put-parameter --name "/ldc-workflow/prod/logging/log_level" --value "DEBUG" --overwrite
+aws ssm put-parameter --name "/ldc-workflow/prod/logging/enable_detailed_logging" --value "true" --overwrite
+
+# Check CloudWatch logs, then disable
+aws ssm put-parameter --name "/ldc-workflow/prod/logging/log_level" --value "WARN" --overwrite
+aws ssm put-parameter --name "/ldc-workflow/prod/logging/enable_detailed_logging" --value "false" --overwrite
+```
+
+### Reading Parameters in Code
+
+```java
+import software.amazon.awssdk.services.ssm.SsmClient;
+import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
+
+@Service
+public class ConfigurationService {
+    private final SsmClient ssmClient = SsmClient.builder().build();
+    
+    public String getParameter(String category, String parameterName) {
+        String fullName = String.format("/ldc-workflow/prod/%s/%s", category, parameterName);
+        
+        GetParameterRequest request = GetParameterRequest.builder()
+            .name(fullName)
+            .withDecryption(false)
+            .build();
+        
+        return ssmClient.getParameter(request).parameter().value();
+    }
+    
+    public int getReclassTimerSeconds() {
+        return Integer.parseInt(getParameter("timing", "reclass_timer_seconds"));
+    }
+    
+    public boolean isVendPpaEnabled() {
+        String value = getParameter("feature_flags", "enable_vend_ppa_integration");
+        return Boolean.parseBoolean(value);
+    }
+}
+```
+
+### View & Audit Parameters
+
+```bash
+# List all parameters
+aws ssm describe-parameters \
+  --filters "Key=Name,Values=/ldc-workflow/prod" \
+  --query 'Parameters[*].[Name,Type,LastModifiedDate]' \
+  --output table
+
+# Get parameter value
+aws ssm get-parameter \
+  --name "/ldc-workflow/prod/timing/reclass_timer_seconds" \
+  --query 'Parameter.Value' \
+  --output text
+
+# View parameter history
+aws ssm get-parameter-history \
+  --name "/ldc-workflow/prod/timing/reclass_timer_seconds" \
+  --query 'Parameters[*].[Version,Value,LastModifiedDate]' \
+  --output table
+
+# Audit changes with CloudTrail
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=/ldc-workflow/prod \
+  --query 'Events[*].[EventTime,EventName,Username]' \
+  --output table
 ```
 
 ## Build & Deployment
