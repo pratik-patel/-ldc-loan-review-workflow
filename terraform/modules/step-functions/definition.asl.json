@@ -1,0 +1,363 @@
+{
+  "Comment": "LDC Loan Review Workflow - Orchestrates the complete loan review process",
+  "StartAt": "ValidateReviewType",
+  "States": {
+    "ValidateReviewType": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "reviewTypeValidation",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber",
+          "reviewType.$": "$.reviewType",
+          "currentAssignedUsername.$": "$.currentAssignedUsername",
+          "attributes.$": "$.attributes"
+        }
+      },
+      "ResultPath": "$.validationResult",
+      "Next": "CheckReviewTypeValid",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "ReviewTypeValidationError"
+        }
+      ]
+    },
+    "CheckReviewTypeValid": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.validationResult.Payload.success",
+          "BooleanEquals": true,
+          "Next": "PauseForReviewTypeAssignment"
+        }
+      ],
+      "Default": "ReviewTypeValidationError"
+    },
+    "ReviewTypeValidationError": {
+      "Type": "Fail",
+      "Error": "InvalidReviewType",
+      "Cause": "Review type validation failed"
+    },
+    "PauseForReviewTypeAssignment": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Parameters": {
+        "QueueUrl.$": "$.pauseQueueUrl",
+        "MessageBody": {
+          "taskToken.$": "$$.Task.Token",
+          "stage": "ReviewTypeAssignment",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber"
+        }
+      },
+      "ResultPath": "$.pauseResult",
+      "Next": "WaitForLoanDecision",
+      "TimeoutSeconds": 86400,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskStateAborted"],
+          "Next": "ReviewTypeAssignmentAborted"
+        }
+      ]
+    },
+    "ReviewTypeAssignmentAborted": {
+      "Type": "Fail",
+      "Error": "ReviewTypeAssignmentAborted",
+      "Cause": "Review type assignment was aborted"
+    },
+    "WaitForLoanDecision": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Parameters": {
+        "QueueUrl.$": "$.pauseQueueUrl",
+        "MessageBody": {
+          "taskToken.$": "$$.Task.Token",
+          "stage": "LoanDecision",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber"
+        }
+      },
+      "ResultPath": "$.loanDecisionResult",
+      "Next": "CheckCompletionCriteria",
+      "TimeoutSeconds": 604800,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskStateAborted"],
+          "Next": "LoanDecisionAborted"
+        }
+      ]
+    },
+    "LoanDecisionAborted": {
+      "Type": "Fail",
+      "Error": "LoanDecisionAborted",
+      "Cause": "Loan decision was aborted"
+    },
+    "CheckCompletionCriteria": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "completionCriteria",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber",
+          "loanDecision.$": "$.loanDecision",
+          "attributes.$": "$.attributes"
+        }
+      },
+      "ResultPath": "$.completionResult",
+      "Next": "IsLoanDecisionComplete",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "CompletionCheckError"
+        }
+      ]
+    },
+    "IsLoanDecisionComplete": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.completionResult.Payload.complete",
+          "BooleanEquals": true,
+          "Next": "DetermineLoanStatus"
+        }
+      ],
+      "Default": "WaitForLoanDecision"
+    },
+    "CompletionCheckError": {
+      "Type": "Fail",
+      "Error": "CompletionCheckFailed",
+      "Cause": "Failed to check completion criteria"
+    },
+    "DetermineLoanStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "loanStatusDetermination",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber",
+          "loanDecision.$": "$.loanDecision",
+          "attributes.$": "$.attributes"
+        }
+      },
+      "ResultPath": "$.statusResult",
+      "Next": "RouteLoanDecision",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "StatusDeterminationError"
+        }
+      ]
+    },
+    "StatusDeterminationError": {
+      "Type": "Fail",
+      "Error": "StatusDeterminationFailed",
+      "Cause": "Failed to determine loan status"
+    },
+    "RouteLoanDecision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.statusResult.Payload.status",
+          "StringEquals": "Approved",
+          "Next": "CallVendPpa"
+        },
+        {
+          "Variable": "$.statusResult.Payload.status",
+          "StringEquals": "Rejected",
+          "Next": "CallVendPpa"
+        },
+        {
+          "Variable": "$.statusResult.Payload.status",
+          "StringEquals": "Repurchase",
+          "Next": "SendRepurchaseEmail"
+        },
+        {
+          "Variable": "$.statusResult.Payload.status",
+          "StringEquals": "Reclass Approved",
+          "Next": "StartReclassTimer"
+        }
+      ],
+      "Default": "UnknownLoanStatus"
+    },
+    "UnknownLoanStatus": {
+      "Type": "Fail",
+      "Error": "UnknownLoanStatus",
+      "Cause": "Unable to determine loan status"
+    },
+    "CallVendPpa": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "vendPpaIntegration",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber",
+          "loanDecision.$": "$.loanDecision",
+          "loanStatus.$": "$.statusResult.Payload.status"
+        }
+      },
+      "ResultPath": "$.vendPpaResult",
+      "Next": "CheckVendPpaSuccess",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "VendPpaError"
+        }
+      ]
+    },
+    "CheckVendPpaSuccess": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.vendPpaResult.Payload.success",
+          "BooleanEquals": true,
+          "Next": "LogAuditTrail"
+        }
+      ],
+      "Default": "VendPpaError"
+    },
+    "VendPpaError": {
+      "Type": "Fail",
+      "Error": "VendPpaIntegrationFailed",
+      "Cause": "Vend PPA API call failed"
+    },
+    "SendRepurchaseEmail": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "emailNotification",
+          "notificationType": "Repurchase",
+          "loanNumber.$": "$.loanNumber",
+          "requestNumber.$": "$.requestNumber",
+          "templateName": "repurchase"
+        }
+      },
+      "ResultPath": "$.emailResult",
+      "Next": "LogAuditTrail",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "LogAuditTrail"
+        }
+      ]
+    },
+    "StartReclassTimer": {
+      "Type": "Wait",
+      "Seconds": 172800,
+      "Next": "CheckReclassConfirmation"
+    },
+    "CheckReclassConfirmation": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:getItem",
+      "Parameters": {
+        "TableName.$": "$.dynamoDbTableName",
+        "Key": {
+          "requestNumber": {
+            "S.$": "$.requestNumber"
+          },
+          "executionId": {
+            "S.$": "$.executionId"
+          }
+        }
+      },
+      "ResultPath": "$.reclassCheckResult",
+      "Next": "IsReclassConfirmed",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "SendReclassExpirationEmail"
+        }
+      ]
+    },
+    "IsReclassConfirmed": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.reclassCheckResult.Item.reclassConfirmed.BOOL",
+          "BooleanEquals": true,
+          "Next": "AddToSqsQueue"
+        }
+      ],
+      "Default": "SendReclassExpirationEmail"
+    },
+    "AddToSqsQueue": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "sqsHandler",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber",
+          "loanDecision.$": "$.loanDecision",
+          "attributes.$": "$.attributes"
+        }
+      },
+      "ResultPath": "$.sqsResult",
+      "Next": "LogAuditTrail",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "LogAuditTrail"
+        }
+      ]
+    },
+    "SendReclassExpirationEmail": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "emailNotification",
+          "notificationType": "ReclassExpired",
+          "loanNumber.$": "$.loanNumber",
+          "requestNumber.$": "$.requestNumber",
+          "templateName": "reclass-expired"
+        }
+      },
+      "ResultPath": "$.emailResult",
+      "Next": "LogAuditTrail",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "LogAuditTrail"
+        }
+      ]
+    },
+    "LogAuditTrail": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "ldc-loan-review-lambda",
+        "Payload": {
+          "handlerType": "auditTrail",
+          "requestNumber.$": "$.requestNumber",
+          "loanNumber.$": "$.loanNumber",
+          "executionId.$": "$.executionId",
+          "stateChange": "WorkflowCompleted"
+        }
+      },
+      "ResultPath": "$.auditResult",
+      "Next": "WorkflowComplete",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "WorkflowComplete"
+        }
+      ]
+    },
+    "WorkflowComplete": {
+      "Type": "Succeed"
+    }
+  }
+}

@@ -1,0 +1,196 @@
+#!/bin/bash
+
+# Test script for LDC Loan Review Workflow Step Functions
+# Tests the complete workflow through Step Functions state machine
+
+set -e
+
+STATE_MACHINE_ARN="arn:aws:states:us-east-1:851725256415:stateMachine:ldc-loan-review-workflow"
+AWS_REGION="us-east-1"
+
+echo "=========================================="
+echo "LDC Loan Review Workflow - Step Functions Test Suite"
+echo "=========================================="
+echo ""
+
+# Test 1: Happy Path - Valid Review Type
+echo "Test 1: Happy Path - Valid Review Type (LDCReview)"
+EXECUTION_NAME="test-happy-path-$(date +%s)"
+PAYLOAD=$(cat <<EOF
+{
+  "requestNumber": "REQ-HAPPY-001",
+  "loanNumber": "LOAN-HAPPY-001",
+  "reviewType": "LDCReview",
+  "currentAssignedUsername": "testuser",
+  "attributes": [
+    {"attributeName": "CreditScore", "attributeDecision": "Pending"},
+    {"attributeName": "DebtRatio", "attributeDecision": "Pending"}
+  ]
+}
+EOF
+)
+
+EXECUTION_RESPONSE=$(aws stepfunctions start-execution \
+  --state-machine-arn "$STATE_MACHINE_ARN" \
+  --name "$EXECUTION_NAME" \
+  --input "$PAYLOAD" \
+  --region "$AWS_REGION" 2>&1)
+
+EXECUTION_ARN=$(echo "$EXECUTION_RESPONSE" | grep -o '"executionArn": "[^"]*' | cut -d'"' -f4)
+
+if [ -n "$EXECUTION_ARN" ]; then
+  echo "✓ Execution started: $EXECUTION_ARN"
+  
+  # Wait for execution to progress
+  sleep 3
+  
+  # Get execution history
+  HISTORY=$(aws stepfunctions get-execution-history \
+    --execution-arn "$EXECUTION_ARN" \
+    --region "$AWS_REGION" 2>&1)
+  
+  EVENT_COUNT=$(echo "$HISTORY" | grep -o '"type"' | wc -l)
+  echo "✓ Execution progressed with $EVENT_COUNT events"
+  
+  # Check for failures
+  if echo "$HISTORY" | grep -q "ExecutionFailed"; then
+    echo "⚠ Execution failed"
+    echo "$HISTORY" | jq '.events[] | select(.executionFailedEventDetails != null) | .executionFailedEventDetails'
+  else
+    echo "✓ No execution failures detected"
+  fi
+else
+  echo "⚠ Failed to start execution"
+fi
+echo ""
+
+# Test 2: Invalid Review Type
+echo "Test 2: Invalid Review Type"
+EXECUTION_NAME="test-invalid-type-$(date +%s)"
+PAYLOAD=$(cat <<EOF
+{
+  "requestNumber": "REQ-INVALID-001",
+  "loanNumber": "LOAN-INVALID-001",
+  "reviewType": "InvalidType",
+  "currentAssignedUsername": "testuser"
+}
+EOF
+)
+
+EXECUTION_RESPONSE=$(aws stepfunctions start-execution \
+  --state-machine-arn "$STATE_MACHINE_ARN" \
+  --name "$EXECUTION_NAME" \
+  --input "$PAYLOAD" \
+  --region "$AWS_REGION" 2>&1)
+
+EXECUTION_ARN=$(echo "$EXECUTION_RESPONSE" | grep -o '"executionArn": "[^"]*' | cut -d'"' -f4)
+
+if [ -n "$EXECUTION_ARN" ]; then
+  echo "✓ Execution started: $EXECUTION_ARN"
+  
+  # Wait for execution to process
+  sleep 3
+  
+  # Get execution history
+  HISTORY=$(aws stepfunctions get-execution-history \
+    --execution-arn "$EXECUTION_ARN" \
+    --region "$AWS_REGION" 2>&1)
+  
+  # Check for expected failure
+  if echo "$HISTORY" | grep -q "ExecutionFailed\|ReviewTypeValidationError"; then
+    echo "✓ Execution failed as expected for invalid review type"
+  else
+    echo "⚠ Execution did not fail for invalid review type"
+  fi
+else
+  echo "⚠ Failed to start execution"
+fi
+echo ""
+
+# Test 3: SecPolicyReview Type
+echo "Test 3: SecPolicyReview Type"
+EXECUTION_NAME="test-secpolicy-$(date +%s)"
+PAYLOAD=$(cat <<EOF
+{
+  "requestNumber": "REQ-SECPOLICY-001",
+  "loanNumber": "LOAN-SECPOLICY-001",
+  "reviewType": "SecPolicyReview",
+  "currentAssignedUsername": "testuser",
+  "attributes": [
+    {"attributeName": "ComplianceCheck", "attributeDecision": "Pending"}
+  ]
+}
+EOF
+)
+
+EXECUTION_RESPONSE=$(aws stepfunctions start-execution \
+  --state-machine-arn "$STATE_MACHINE_ARN" \
+  --name "$EXECUTION_NAME" \
+  --input "$PAYLOAD" \
+  --region "$AWS_REGION" 2>&1)
+
+EXECUTION_ARN=$(echo "$EXECUTION_RESPONSE" | grep -o '"executionArn": "[^"]*' | cut -d'"' -f4)
+
+if [ -n "$EXECUTION_ARN" ]; then
+  echo "✓ Execution started: $EXECUTION_ARN"
+  
+  # Wait for execution to progress
+  sleep 3
+  
+  # Get execution history
+  HISTORY=$(aws stepfunctions get-execution-history \
+    --execution-arn "$EXECUTION_ARN" \
+    --region "$AWS_REGION" 2>&1)
+  
+  EVENT_COUNT=$(echo "$HISTORY" | grep -o '"type"' | wc -l)
+  echo "✓ Execution progressed with $EVENT_COUNT events"
+else
+  echo "⚠ Failed to start execution"
+fi
+echo ""
+
+# Test 4: ConduitReview Type
+echo "Test 4: ConduitReview Type"
+EXECUTION_NAME="test-conduit-$(date +%s)"
+PAYLOAD=$(cat <<EOF
+{
+  "requestNumber": "REQ-CONDUIT-001",
+  "loanNumber": "LOAN-CONDUIT-001",
+  "reviewType": "ConduitReview",
+  "currentAssignedUsername": "testuser",
+  "attributes": [
+    {"attributeName": "ConduitCompliance", "attributeDecision": "Pending"}
+  ]
+}
+EOF
+)
+
+EXECUTION_RESPONSE=$(aws stepfunctions start-execution \
+  --state-machine-arn "$STATE_MACHINE_ARN" \
+  --name "$EXECUTION_NAME" \
+  --input "$PAYLOAD" \
+  --region "$AWS_REGION" 2>&1)
+
+EXECUTION_ARN=$(echo "$EXECUTION_RESPONSE" | grep -o '"executionArn": "[^"]*' | cut -d'"' -f4)
+
+if [ -n "$EXECUTION_ARN" ]; then
+  echo "✓ Execution started: $EXECUTION_ARN"
+  
+  # Wait for execution to progress
+  sleep 3
+  
+  # Get execution history
+  HISTORY=$(aws stepfunctions get-execution-history \
+    --execution-arn "$EXECUTION_ARN" \
+    --region "$AWS_REGION" 2>&1)
+  
+  EVENT_COUNT=$(echo "$HISTORY" | grep -o '"type"' | wc -l)
+  echo "✓ Execution progressed with $EVENT_COUNT events"
+else
+  echo "⚠ Failed to start execution"
+fi
+echo ""
+
+echo "=========================================="
+echo "Step Functions Test Suite Complete"
+echo "=========================================="

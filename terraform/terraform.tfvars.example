@@ -1,0 +1,50 @@
+# Copy this file to terraform.tfvars and update with your values
+# DO NOT commit terraform.tfvars to version control
+
+aws_region  = "us-east-1"
+environment = "dev"
+
+# DynamoDB Configuration
+dynamodb_table_name                = "ldc-loan-review-state"
+dynamodb_billing_mode              = "PAY_PER_REQUEST"
+dynamodb_point_in_time_recovery    = true
+
+# SQS Configuration
+sqs_queue_name           = "ldc-loan-review-reclass-confirmations"
+sqs_message_retention    = 1209600
+sqs_visibility_timeout   = 300
+
+# SNS Configuration
+sns_topic_name = "ldc-loan-review-notifications"
+
+# SES Configuration
+ses_sender_email = "noreply@ldc.com"
+
+# Lambda Configuration
+lambda_function_name     = "ldc-loan-review-lambda"
+lambda_timeout           = 60
+lambda_memory_size       = 512
+
+# Step Functions Configuration
+step_functions_state_machine_name = "ldc-loan-review-workflow"
+
+# CloudWatch Configuration
+cloudwatch_log_retention_days = 30
+
+# Email Templates
+email_templates = {
+  repurchase = {
+    subject = "Loan Repurchase Decision"
+    body    = "Your loan has been marked for repurchase. Please review the details and take appropriate action."
+  }
+  reclass_expired = {
+    subject = "Reclass Confirmation Expired"
+    body    = "The reclass confirmation period has expired. The loan has been escalated for manual review."
+  }
+}
+
+# Notification Emails
+notification_emails = {
+  repurchase = "repurchase-team@ldc.com"
+  reclass    = "reclass-team@ldc.com"
+}

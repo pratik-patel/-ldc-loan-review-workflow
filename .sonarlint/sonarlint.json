@@ -1,0 +1,41 @@
+{
+  "rules": {
+    "java:S1104": {
+      "level": "MAJOR",
+      "description": "Class variable visibility should be private"
+    },
+    "java:S1118": {
+      "level": "MAJOR",
+      "description": "Utility classes should not have public constructors"
+    },
+    "java:S1192": {
+      "level": "MINOR",
+      "description": "String literals should not be duplicated"
+    },
+    "java:S1481": {
+      "level": "MINOR",
+      "description": "Unused local variables should be removed"
+    },
+    "java:S2095": {
+      "level": "CRITICAL",
+      "description": "Resources should be closed"
+    },
+    "java:S2696": {
+      "level": "MAJOR",
+      "description": "Instance methods should not write to static fields"
+    },
+    "java:S3776": {
+      "level": "MAJOR",
+      "description": "Cognitive Complexity of methods should not be too high"
+    },
+    "java:S4790": {
+      "level": "CRITICAL",
+      "description": "Using weak cryptographic algorithms"
+    }
+  },
+  "exclusions": [
+    "**/target/**",
+    "**/test/**",
+    "**/*.class"
+  ]
+}

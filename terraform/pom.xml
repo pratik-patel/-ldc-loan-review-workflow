@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.ldc</groupId>
+        <artifactId>ldc-loan-review-workflow</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>terraform</artifactId>
+    <name>LDC Loan Review Terraform</name>
+    <description>Terraform infrastructure as code for LDC loan review workflow</description>
+    <packaging>pom</packaging>
+
+    <!-- This module contains Terraform files, not Java code -->
+</project>
