@@ -1,0 +1,119 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "loan-ppa-workflow-response.schema.json",
+    "title": "Loan PPA Workflow Response",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "workflows": {
+            "type": "array",
+            "description": "workflows impacted by the operation",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "TaskNumber": {
+                    "type": "integer",
+                    "description": "Unique idenfier for the review task"
+                },
+                "RequestNumber": {
+                    "type": "string",
+                    "description": "PPA request identifier."
+                },
+                "LoanNumber": {
+                    "type": "string",
+                    "description": "Fanniemae Loan Number",
+                    "pattern": "^[0-9]{10}$"
+                },
+                "LoanDecision": {
+                    "type": "string",
+                    "description": "Overall loan decision.",
+                    "enum": [
+                        "Pending Review",
+                        "Reclass",
+                        "Approved",
+                        "Partially Processed",
+                        "Rejected",
+                        "Repurchase"
+                    ]
+                },
+                "Attributes": {
+                    "type": "array",
+                    "description": "List of attribute-level decisions.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "Name": {
+                                "type": "string",
+                                "description": "Attribute name."
+                            },
+                            "Decision": {
+                                "type": "string",
+                                "description": "Decision at the attribute level.",
+                                "enum": [
+                                    "Pending",
+                                    "Reclass",
+                                    "Approved",
+                                    "Rejected",
+                                    "Repurchase"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "Name",
+                            "Decision"
+                        ]
+                    }
+                },
+                "ReviewStep": {
+                    "type": "string",
+                    "description": "Step Workflow is being executed",
+                    "enum": [
+                        "LDC Review",
+                        "Sec Policy Review",
+                        "Conduit Review",
+                        "Waiting Reclass Confirmation",
+                        "System Process",
+                        "Workflow Completed"
+                    ]
+                },
+                "ReviewStepUserId": {
+                    "type": "string",
+                    "description": "User Id to whom user step is assigned"
+                },
+                "WorkflowStateName": {
+                    "type": "string",
+                    "description": "Name of the current execution state in the workflow definition"
+                },
+                "StateTransitionHistory": {
+                    "type": "array",
+                    "description": "List of Workflow previously executed states.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "WorkflowStateName": {
+                                "type": "string",
+                                "description": "Name of the execution state in the workflow definition"
+                            },
+                            "WorkflowStateUserId": {
+                                "type": "string",
+                                "description": "User Id who executed the state"
+                            },
+                            "WorkflowStateStartDateTime": {
+                                "type": "string",
+                                "format": "time",
+                                "description": "Datetime when the workflow started in this state"
+                            },
+                            "WorkflowStateEndDateTime": {
+                                "type": "string",
+                                "format": "time",
+                                "description": "Datetime when the workflow state completed"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

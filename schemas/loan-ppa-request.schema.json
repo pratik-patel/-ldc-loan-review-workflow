@@ -1,0 +1,115 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "loan-ppa-request.schema.json",
+    "title": "Loan PPA Request",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "TaskNumber": {
+            "type": "integer",
+            "description": "Unique idenfier for the review task"
+        },
+        "RequestNumber": {
+            "type": "string",
+            "description": "PPA request identifier."
+        },
+        "LoanNumber": {
+            "type": "string",
+            "description": "Fanniemae Loan Number",
+            "pattern": "^[0-9]{10}$"
+        },
+        "ReviewType": {
+            "type": "string",
+            "description": "Type of review required.",
+            "enum": [
+                "LDC",
+                "Sec Policy",
+                "Conduit"
+            ]
+        },
+        "ReviewStepUserId": {
+            "type": "string",
+            "description": "User Id to whom user step should be assigned"
+        },
+        "SelectionCriteria": {
+            "type": "object",
+            "properties": {
+                "TaskNumber": {
+                    "type": "integer",
+                    "description": "Unique idenfier for the review task"
+                },
+                "RequestNumber": {
+                    "type": "string",
+                    "description": "PPA request identifier."
+                },
+                "LoanNumber": {
+                    "type": "string",
+                    "description": "Fanniemae Loan Number",
+                    "pattern": "^[0-9]{10}$"
+                },
+                "WorkflowEarliestStartDateTime": {
+                    "type": "string",
+                    "format": "time",
+                    "description": "Earliest datetime when the workflow started for the loan"
+                },
+                "ReviewStep": {
+                    "type": "string",
+                    "description": "Step Workflow is being executed",
+                    "enum": [
+                        "LDC Review",
+                        "Sec Policy Review",
+                        "Conduit Review",
+                        "Waiting Reclass Confirmation",
+                        "System Process",
+                        "Workflow Completed"
+                    ]
+                },
+                "ReviewStepUserId": {
+                    "type": "string",
+                    "description": "User Id step is assigned"
+                }
+            }
+        },
+        "LoanDecision": {
+            "type": "string",
+            "description": "Overall loan decision.",
+            "enum": [
+                "Pending Review",
+                "Reclass",
+                "Approved",
+                "Partially Processed",
+                "Rejected",
+                "Repurchase"
+            ]
+        },
+        "Attributes": {
+            "type": "array",
+            "description": "List of attribute-level decisions.",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "Name": {
+                        "type": "string",
+                        "description": "Attribute name."
+                    },
+                    "Decision": {
+                        "type": "string",
+                        "description": "Decision at the attribute level.",
+                        "enum": [
+                            "Pending",
+                            "Reclass",
+                            "Approved",
+                            "Rejected",
+                            "Repurchase"
+                        ]
+                    }
+                },
+                "required": [
+                    "Name",
+                    "Decision"
+                ]
+            }
+        }
+    }
+}
