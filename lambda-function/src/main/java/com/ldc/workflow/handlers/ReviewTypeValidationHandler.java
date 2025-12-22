@@ -3,22 +3,25 @@ package com.ldc.workflow.handlers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldc.workflow.repository.WorkflowStateRepository;
+import com.ldc.workflow.types.LoanPpaRequest;
+import com.ldc.workflow.types.StateTransition;
 import com.ldc.workflow.types.WorkflowState;
 import com.ldc.workflow.validation.ReviewTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Function;
 
 /**
  * Lambda handler for review type validation.
- * Validates that the review type is one of the allowed values and stores it in
- * DynamoDB.
- * 
- * Input: JSON with requestNumber, loanNumber, reviewType, attributes,
- * loanDecision, currentAssignedUsername
- * Output: JSON with validation result and updated workflow state
+ * Implements Requirements 9 & 10:
+ * - Validates strict input schema (LoanPpaRequest)
+ * - Initializes State Transition History
+ * - Maps external review types to internal values
  */
 @Component("reviewTypeValidationHandler")
 public class ReviewTypeValidationHandler implements Function<JsonNode, JsonNode> {
@@ -40,101 +43,107 @@ public class ReviewTypeValidationHandler implements Function<JsonNode, JsonNode>
         try {
             logger.info("Review Type Validation handler invoked");
 
-            // Validate required fields exist
-            if (!input.has("requestNumber") || input.get("requestNumber").isNull()) {
-                logger.warn("Missing required field: requestNumber");
-                return createErrorResponse("unknown", "unknown", "unknown", "Missing required field: requestNumber");
-            }
-            if (!input.has("loanNumber") || input.get("loanNumber").isNull()) {
-                logger.warn("Missing required field: loanNumber");
-                return createErrorResponse("unknown", "unknown", "unknown", "Missing required field: loanNumber");
-            }
-            if (!input.has("reviewType") || input.get("reviewType").isNull()) {
-                logger.warn("Missing required field: reviewType");
-                return createErrorResponse("unknown", "unknown", "unknown", "Missing required field: reviewType");
+            // Requirement 9: Deserialize and Validate Input
+            LoanPpaRequest request;
+            try {
+                request = objectMapper.treeToValue(input, LoanPpaRequest.class);
+            } catch (Exception e) {
+                logger.error("Invalid request schema", e);
+                return createErrorResponse("unknown", "Invalid request format: " + e.getMessage());
             }
 
-            // Extract input fields
-            String requestNumber = input.get("requestNumber").asText();
-            String loanNumber = input.get("loanNumber").asText();
-            String reviewType = input.get("reviewType").asText();
-            String executionId = input.has("executionId") ? input.get("executionId").asText()
-                    : "ldc-loan-review-" + requestNumber;
+            // Validate Required Fields
+            if (request.getRequestNumber() == null)
+                return createErrorResponse("unknown", "Missing RequestNumber");
+            if (request.getLoanNumber() == null)
+                return createErrorResponse(request.getRequestNumber(), "Missing LoanNumber");
+            if (request.getReviewType() == null)
+                return createErrorResponse(request.getRequestNumber(), "Missing ReviewType");
 
-            logger.debug("Validating review type: {} for requestNumber: {}", reviewType, requestNumber);
-
-            // Validate review type
-            if (!reviewTypeValidator.isValid(reviewType)) {
-                logger.warn("Invalid review type: {}", reviewType);
-                return createErrorResponse(requestNumber, loanNumber, reviewType,
-                        reviewTypeValidator.getErrorMessage(reviewType));
+            // Validate Loan Number Pattern (Req 9.4)
+            if (!request.getLoanNumber().matches("^[0-9]{10}$")) {
+                return createErrorResponse(request.getRequestNumber(), "Invalid LoanNumber format");
             }
 
-            // Create or update workflow state
+            // Map External Review Type to Internal (Req 9.3)
+            String internalReviewType;
+            switch (request.getReviewType()) {
+                case "LDC":
+                    internalReviewType = "LDCReview";
+                    break;
+                case "Sec Policy":
+                    internalReviewType = "SecPolicyReview";
+                    break;
+                case "Conduit":
+                    internalReviewType = "ConduitReview";
+                    break;
+                default:
+                    // Also accept internal types if passed directly
+                    if (reviewTypeValidator.isValid(request.getReviewType())) {
+                        internalReviewType = request.getReviewType();
+                    } else {
+                        return createErrorResponse(request.getRequestNumber(),
+                                "Invalid ReviewType: " + request.getReviewType());
+                    }
+            }
+
+            String executionId = "ldc-loan-review-" + request.getRequestNumber();
+
+            // Requirement 10: Initialize State History
             WorkflowState state = new WorkflowState();
-            state.setRequestNumber(requestNumber);
-            state.setLoanNumber(loanNumber);
-            state.setReviewType(reviewType);
+            state.setRequestNumber(request.getRequestNumber());
+            state.setLoanNumber(request.getLoanNumber());
+            state.setReviewType(internalReviewType);
             state.setExecutionId(executionId);
             state.setStatus("PENDING");
+            state.setWorkflowStateName("ValidateReviewType");
+            state.setCreatedAt(Instant.now().toString());
 
-            // Copy optional fields from input
-            if (input.has("loanDecision") && !input.get("loanDecision").isNull()) {
-                state.setLoanDecision(input.get("loanDecision").asText());
-            }
-            if (input.has("currentAssignedUsername") && !input.get("currentAssignedUsername").isNull()) {
-                state.setCurrentAssignedUsername(input.get("currentAssignedUsername").asText());
-            }
-            if (input.has("attributes") && !input.get("attributes").isNull()) {
-                state.setAttributes(objectMapper.readValue(
-                        objectMapper.writeValueAsString(input.get("attributes")),
-                        objectMapper.getTypeFactory().constructCollectionType(java.util.List.class,
-                                com.ldc.workflow.types.LoanAttribute.class)));
+            // Add Initial State Transition
+            StateTransition initialTransition = new StateTransition(
+                    "ValidateReviewType",
+                    request.getReviewStepUserId() != null ? request.getReviewStepUserId() : "System",
+                    Instant.now().toString(),
+                    Instant.now().toString());
+            state.addStateTransition(initialTransition);
+
+            // Copy attributes if present (Req 9.5 validation happens in validator/logic)
+            if (request.getAttributes() != null) {
+                // Convert LoanPpaRequest.Attribute to LoanAttribute internal type if needed,
+                // or just store raw for now. Assuming LoanAttribute is compatible or similar.
+                // For now, we will serialize/deserialize to handle the type mismatch if fields
+                // align
+                // But LoanAttribute uses lowercase 'attributeName' vs 'Name'.
+                // We need to map them.
+                List<com.ldc.workflow.types.LoanAttribute> internalAttributes = new ArrayList<>();
+                for (LoanPpaRequest.Attribute attr : request.getAttributes()) {
+                    com.ldc.workflow.types.LoanAttribute internalAttr = new com.ldc.workflow.types.LoanAttribute();
+                    internalAttr.setAttributeName(attr.getName());
+                    internalAttr.setAttributeDecision(attr.getDecision());
+                    internalAttributes.add(internalAttr);
+                }
+                state.setAttributes(internalAttributes);
             }
 
             // Save to DynamoDB
             workflowStateRepository.save(state);
-            logger.info("Review type validated and stored successfully for requestNumber: {}", requestNumber);
+            logger.info("Review type validated and stored successfully for RequestNumber: {}",
+                    request.getRequestNumber());
 
-            // Return success response
-            return createSuccessResponse(state);
+            // Return updated state structure (which includes history)
+            return objectMapper.valueToTree(state);
+
         } catch (Exception e) {
             logger.error("Error in review type validation handler", e);
-            return createErrorResponse("unknown", "unknown", "unknown",
-                    "Internal error: " + e.getMessage());
+            return createErrorResponse("unknown", "Internal error: " + e.getMessage());
         }
     }
 
-    private JsonNode createSuccessResponse(WorkflowState state) {
+    private JsonNode createErrorResponse(String requestNumber, String error) {
         return objectMapper.createObjectNode()
-                .put("success", true)
-                .put("requestNumber", state.getRequestNumber())
-                .put("loanNumber", state.getLoanNumber())
-                .put("reviewType", state.getReviewType())
-                .put("executionId", state.getExecutionId())
-                .put("isValid", true)
-                .put("message", "Review type validated successfully");
-    }
-
-    private JsonNode createErrorResponse(String requestNumber, String loanNumber, String reviewType, String error) {
-        JsonNode allowedValues = objectMapper.createArrayNode();
-        try {
-            if (reviewTypeValidator != null) {
-                allowedValues = objectMapper.valueToTree(reviewTypeValidator.getAllowedReviewTypes());
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to get allowed review types", e);
-        }
-
-        JsonNode response = objectMapper.createObjectNode()
                 .put("success", false)
                 .put("requestNumber", requestNumber)
-                .put("loanNumber", loanNumber)
-                .put("reviewType", reviewType)
                 .put("isValid", false)
-                .put("error", error)
-                .set("allowedValues", allowedValues);
-
-        return response;
+                .put("error", error);
     }
 }

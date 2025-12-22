@@ -7,14 +7,7 @@
       "Resource": "arn:aws:states:::lambda:invoke",
       "Parameters": {
         "FunctionName": "ldc-loan-review-lambda",
-        "Payload": {
-          "handlerType": "reviewTypeValidation",
-          "requestNumber.$": "$.requestNumber",
-          "loanNumber.$": "$.loanNumber",
-          "reviewType.$": "$.reviewType",
-          "currentAssignedUsername.$": "$.currentAssignedUsername",
-          "attributes.$": "$.attributes"
-        }
+        "Payload.$": "$"
       },
       "ResultPath": "$.validationResult",
       "Next": "CheckReviewTypeValid",
@@ -153,7 +146,8 @@
           "loanDecision.$": "$.loanDecisionResult.loanDecision",
           "attributes.$": "$.loanDecisionResult.attributes",
           "executionId.$": "$.executionId",
-          "dynamoDbTableName.$": "$.dynamoDbTableName"
+          "dynamoDbTableName.$": "$.dynamoDbTableName",
+          "stateTransitionHistory.$": "$.validationResult.Payload.stateTransitionHistory"
         }
       },
       "ResultPath": "$.statusResult",
@@ -247,7 +241,6 @@
       "Error": "VendPpaIntegrationFailed",
       "Cause": "Vend PPA API call failed"
     },
-
     "PauseForReclassConfirmation": {
       "Type": "Task",
       "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",

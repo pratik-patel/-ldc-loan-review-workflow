@@ -1,6 +1,7 @@
 package com.ldc.workflow.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -8,45 +9,52 @@ import java.util.List;
  * This state is maintained throughout the workflow and persisted to DynamoDB.
  */
 public class WorkflowState {
-    
+
     @JsonProperty("requestNumber")
     private String requestNumber;
-    
+
     @JsonProperty("loanNumber")
     private String loanNumber;
-    
+
     @JsonProperty("reviewType")
     private String reviewType;
-    
+
     @JsonProperty("loanDecision")
     private String loanDecision;
-    
+
     @JsonProperty("loanStatus")
     private String loanStatus;
-    
+
     @JsonProperty("attributes")
     private List<LoanAttribute> attributes;
-    
+
     @JsonProperty("currentAssignedUsername")
     private String currentAssignedUsername;
-    
+
     @JsonProperty("createdAt")
     private String createdAt;
-    
+
     @JsonProperty("updatedAt")
     private String updatedAt;
-    
+
     @JsonProperty("executionId")
     private String executionId;
-    
+
     @JsonProperty("taskToken")
     private String taskToken;
-    
+
     @JsonProperty("status")
     private String status; // PENDING, COMPLETED, FAILED
 
+    @JsonProperty("workflowStateName")
+    private String workflowStateName;
+
+    @JsonProperty("stateTransitionHistory")
+    private List<StateTransition> stateTransitionHistory = new ArrayList<>();
+
     // Constructors
-    public WorkflowState() {}
+    public WorkflowState() {
+    }
 
     public WorkflowState(String requestNumber, String loanNumber, String reviewType) {
         this.requestNumber = requestNumber;
@@ -149,5 +157,28 @@ public class WorkflowState {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getWorkflowStateName() {
+        return workflowStateName;
+    }
+
+    public void setWorkflowStateName(String workflowStateName) {
+        this.workflowStateName = workflowStateName;
+    }
+
+    public List<StateTransition> getStateTransitionHistory() {
+        return stateTransitionHistory;
+    }
+
+    public void setStateTransitionHistory(List<StateTransition> stateTransitionHistory) {
+        this.stateTransitionHistory = stateTransitionHistory;
+    }
+
+    public void addStateTransition(StateTransition transition) {
+        if (this.stateTransitionHistory == null) {
+            this.stateTransitionHistory = new ArrayList<>();
+        }
+        this.stateTransitionHistory.add(transition);
     }
 }

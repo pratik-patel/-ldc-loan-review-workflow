@@ -1,0 +1,27 @@
+{
+    "handlerType": "reviewTypeValidation",
+    "TaskNumber": 12345,
+    "RequestNumber": "REQ-TEST-001",
+    "LoanNumber": "1234567890",
+    "ReviewType": "LDC",
+    "ReviewStepUserId": "user123",
+    "SelectionCriteria": {
+        "TaskNumber": 12345,
+        "RequestNumber": "REQ-TEST-001",
+        "LoanNumber": "1234567890",
+        "WorkflowEarliestStartDateTime": "2025-12-22T13:00:00Z",
+        "ReviewStep": "LDC Review",
+        "ReviewStepUserId": "user123"
+    },
+    "LoanDecision": "Pending Review",
+    "Attributes": [
+        {
+            "Name": "CreditScore",
+            "Decision": "Pending"
+        },
+        {
+            "Name": "DebtRatio",
+            "Decision": "Pending"
+        }
+    ]
+}

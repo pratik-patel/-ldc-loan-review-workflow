@@ -14,7 +14,8 @@ import java.util.function.Function;
 
 /**
  * Lambda handler for completion criteria validation.
- * Checks if loan decision is complete (all attributes non-null/non-Pending and loan decision non-null).
+ * Checks if loan decision is complete (all attributes non-null/non-Pending and
+ * loan decision non-null).
  * 
  * Input: JSON with requestNumber, loanNumber, loanDecision, attributes
  * Output: JSON with completion status and blocking reasons if incomplete
@@ -39,10 +40,11 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
             // Extract input fields
             String requestNumber = input.get("requestNumber").asText("unknown");
             String loanNumber = input.get("loanNumber").asText("unknown");
-            String loanDecision = input.has("loanDecision") && !input.get("loanDecision").isNull() ? 
-                    input.get("loanDecision").asText() : null;
+            String loanDecision = input.has("loanDecision") && !input.get("loanDecision").isNull()
+                    ? input.get("loanDecision").asText()
+                    : null;
 
-            logger.debug("Checking completion criteria for requestNumber: {}, loanNumber: {}", 
+            logger.debug("Checking completion criteria for requestNumber: {}, loanNumber: {}",
                     requestNumber, loanNumber);
 
             // Extract attributes from input
@@ -52,7 +54,7 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
             boolean isComplete = completionCriteriaChecker.isLoanDecisionComplete(
                     loanDecision, attributes);
 
-            logger.info("Loan decision completion status: {} for requestNumber: {}", 
+            logger.info("Loan decision completion status: {} for requestNumber: {}",
                     isComplete, requestNumber);
 
             if (isComplete) {
@@ -64,14 +66,14 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
             }
         } catch (Exception e) {
             logger.error("Error in completion criteria handler", e);
-            return createErrorResponse("unknown", "unknown", 
+            return createErrorResponse("unknown", "unknown",
                     "Internal error: " + e.getMessage());
         }
     }
 
     private List<LoanAttribute> extractAttributes(JsonNode input) {
         List<LoanAttribute> attributes = new ArrayList<>();
-        
+
         if (!input.has("attributes") || input.get("attributes").isNull()) {
             return attributes;
         }
@@ -83,9 +85,10 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
 
         for (JsonNode attrNode : attributesNode) {
             String name = attrNode.has("attributeName") ? attrNode.get("attributeName").asText() : null;
-            String decision = attrNode.has("attributeDecision") && !attrNode.get("attributeDecision").isNull() ? 
-                    attrNode.get("attributeDecision").asText() : null;
-            
+            String decision = attrNode.has("attributeDecision") && !attrNode.get("attributeDecision").isNull()
+                    ? attrNode.get("attributeDecision").asText()
+                    : null;
+
             if (name != null) {
                 LoanAttribute attr = new LoanAttribute();
                 attr.setAttributeName(name);
@@ -97,8 +100,8 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
         return attributes;
     }
 
-    private JsonNode createSuccessResponse(String requestNumber, String loanNumber, 
-                                          boolean isComplete, String blockingReason) {
+    private JsonNode createSuccessResponse(String requestNumber, String loanNumber,
+            boolean isComplete, String blockingReason) {
         var response = objectMapper.createObjectNode()
                 .put("success", true)
                 .put("requestNumber", requestNumber)
