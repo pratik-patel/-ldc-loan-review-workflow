@@ -61,13 +61,7 @@ module "sns" {
   display_name = "LDC Loan Review Notifications"
 }
 
-# SES Configuration
-module "ses" {
-  source = "./modules/ses"
 
-  sender_email = var.ses_sender_email
-  environment  = var.environment
-}
 
 # Lambda Function
 module "lambda" {
@@ -89,7 +83,6 @@ module "lambda" {
     DYNAMODB_TABLE      = module.dynamodb.table_name
     SQS_QUEUE_URL       = module.sqs.queue_url
     SNS_TOPIC_ARN       = module.sns.topic_arn
-    SES_SENDER_EMAIL    = var.ses_sender_email
     PARAMETER_STORE_PREFIX = "/ldc-workflow"
     SPRING_CLOUD_FUNCTION_DEFINITION = "loanReviewRouter"
     MAIN_CLASS = "com.ldc.workflow.LambdaApplication"
@@ -134,10 +127,6 @@ module "parameter_store" {
   review_type_assignment_timeout_seconds = var.review_type_assignment_timeout_seconds
   loan_decision_timeout_seconds        = var.loan_decision_timeout_seconds
   max_reclass_attempts                 = var.max_reclass_attempts
-  
-  # Email
-  email_templates     = var.email_templates
-  notification_emails = var.notification_emails
   
   # API & Integration
   api_endpoints = var.api_endpoints

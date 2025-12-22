@@ -52,73 +52,7 @@ resource "aws_ssm_parameter" "max_reclass_attempts" {
   }
 }
 
-# Email Configuration - Templates
-resource "aws_ssm_parameter" "email_template_repurchase" {
-  name        = "/${var.parameter_store_prefix}/${var.environment}/email/templates/repurchase"
-  description = "Email template for repurchase notifications"
-  type        = "String"
-  value       = jsonencode(var.email_templates.repurchase)
-  tags = {
-    Category    = "Email"
-    Environment = var.environment
-  }
-}
 
-resource "aws_ssm_parameter" "email_template_reclass_expired" {
-  name        = "/${var.parameter_store_prefix}/${var.environment}/email/templates/reclass_expired"
-  description = "Email template for reclass expiration notifications"
-  type        = "String"
-  value       = jsonencode(var.email_templates.reclass_expired)
-  tags = {
-    Category    = "Email"
-    Environment = var.environment
-  }
-}
-
-resource "aws_ssm_parameter" "email_template_review_type_assignment" {
-  name        = "/${var.parameter_store_prefix}/${var.environment}/email/templates/review_type_assignment"
-  description = "Email template for review type assignment notifications"
-  type        = "String"
-  value       = jsonencode(var.email_templates.review_type_assignment)
-  tags = {
-    Category    = "Email"
-    Environment = var.environment
-  }
-}
-
-# Email Configuration - Recipients
-resource "aws_ssm_parameter" "email_repurchase_team" {
-  name        = "/${var.parameter_store_prefix}/${var.environment}/email/recipients/repurchase_team"
-  description = "Email address for repurchase team notifications"
-  type        = "String"
-  value       = var.notification_emails.repurchase_team
-  tags = {
-    Category    = "Email"
-    Environment = var.environment
-  }
-}
-
-resource "aws_ssm_parameter" "email_reclass_team" {
-  name        = "/${var.parameter_store_prefix}/${var.environment}/email/recipients/reclass_team"
-  description = "Email address for reclass team notifications"
-  type        = "String"
-  value       = var.notification_emails.reclass_team
-  tags = {
-    Category    = "Email"
-    Environment = var.environment
-  }
-}
-
-resource "aws_ssm_parameter" "email_admin" {
-  name        = "/${var.parameter_store_prefix}/${var.environment}/email/recipients/admin"
-  description = "Email address for admin notifications"
-  type        = "String"
-  value       = var.notification_emails.admin
-  tags = {
-    Category    = "Email"
-    Environment = var.environment
-  }
-}
 
 # API & Integration Endpoints
 resource "aws_ssm_parameter" "vend_ppa_api_endpoint" {

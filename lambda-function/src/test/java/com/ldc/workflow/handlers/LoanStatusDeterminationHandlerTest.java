@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,13 +34,10 @@ class LoanStatusDeterminationHandlerTest {
     @Mock
     private LoanStatusDeterminer loanStatusDeterminer;
 
-    @Mock
-    private DynamoDbClient dynamoDbClient;
-
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        handler = new LoanStatusDeterminationHandler(loanStatusDeterminer, dynamoDbClient);
+        handler = new LoanStatusDeterminationHandler(loanStatusDeterminer);
     }
 
     @Test

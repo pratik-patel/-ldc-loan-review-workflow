@@ -38,52 +38,7 @@ variable "max_reclass_attempts" {
   default     = 3
 }
 
-# Email Configuration
-variable "email_templates" {
-  description = "Email templates for notifications"
-  type = object({
-    repurchase = object({
-      subject = string
-      body    = string
-    })
-    reclass_expired = object({
-      subject = string
-      body    = string
-    })
-    review_type_assignment = object({
-      subject = string
-      body    = string
-    })
-  })
-  default = {
-    repurchase = {
-      subject = "Loan Repurchase Decision"
-      body    = "Your loan has been marked for repurchase. Please review the details and take appropriate action."
-    }
-    reclass_expired = {
-      subject = "Reclass Confirmation Expired"
-      body    = "The reclass confirmation period has expired. The loan will proceed with the original decision."
-    }
-    review_type_assignment = {
-      subject = "Review Type Assignment Required"
-      body    = "A new loan review has been assigned. Please review and assign the appropriate review type."
-    }
-  }
-}
 
-variable "notification_emails" {
-  description = "Email addresses for notifications"
-  type = object({
-    repurchase_team = string
-    reclass_team    = string
-    admin           = string
-  })
-  default = {
-    repurchase_team = "repurchase@ldc.com"
-    reclass_team    = "reclass@ldc.com"
-    admin           = "admin@ldc.com"
-  }
-}
 
 # API & Integration Endpoints
 variable "api_endpoints" {

@@ -191,12 +191,12 @@
         {
           "Variable": "$.statusResult.Payload.status",
           "StringEquals": "Repurchase",
-          "Next": "SendRepurchaseEmail"
+          "Next": "CallVendPpa"
         },
         {
           "Variable": "$.statusResult.Payload.status",
           "StringEquals": "Reclass Approved",
-          "Next": "StartReclassTimer"
+          "Next": "PauseForReclassConfirmation"
         }
       ],
       "Default": "UnknownLoanStatus"
@@ -247,132 +247,35 @@
       "Error": "VendPpaIntegrationFailed",
       "Cause": "Vend PPA API call failed"
     },
-    "SendRepurchaseEmail": {
+
+    "PauseForReclassConfirmation": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
       "Parameters": {
-        "FunctionName": "ldc-loan-review-lambda",
-        "Payload": {
-          "handlerType": "emailNotification",
-          "notificationType": "Repurchase",
-          "loanNumber.$": "$.loanNumber",
+        "QueueUrl.$": "$.pauseQueueUrl",
+        "MessageBody": {
+          "taskToken.$": "$.Task.Token",
+          "stage": "ReclassConfirmation",
           "requestNumber.$": "$.requestNumber",
-          "templateName": "repurchase",
-          "dynamoDbTableName.$": "$.dynamoDbTableName"
+          "loanNumber.$": "$.loanNumber"
         }
       },
-      "ResultPath": "$.emailResult",
+      "ResultPath": "$.reclassConfirmationResult",
       "Next": "CallVendPpa",
+      "TimeoutSeconds": 604800,
       "Catch": [
         {
           "ErrorEquals": [
-            "States.ALL"
+            "States.TaskStateAborted"
           ],
-          "Next": "LogAuditTrail"
+          "Next": "ReclassConfirmationAborted"
         }
       ]
     },
-    "StartReclassTimer": {
-      "Type": "Wait",
-      "Seconds": ${reclass_timer_seconds},
-      "Next": "CheckReclassConfirmation"
-    },
-    "CheckReclassConfirmation": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::dynamodb:getItem",
-      "Parameters": {
-        "TableName.$": "$.dynamoDbTableName",
-        "Key": {
-          "requestNumber": {
-            "S.$": "$.requestNumber"
-          },
-          "executionId": {
-            "S.$": "$.executionId"
-          }
-        }
-      },
-      "ResultPath": "$.reclassCheckResult",
-      "Next": "IsReclassConfirmed",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "Next": "SendReclassExpirationEmail"
-        }
-      ]
-    },
-    "IsReclassConfirmed": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.reclassCheckResult.Item",
-          "IsPresent": true,
-          "Next": "CheckReclassConfirmedValue"
-        }
-      ],
-      "Default": "SendReclassExpirationEmail"
-    },
-    "CheckReclassConfirmedValue": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.reclassCheckResult.Item.reclassConfirmed.BOOL",
-          "BooleanEquals": true,
-          "Next": "AddToSqsQueue"
-        }
-      ],
-      "Default": "SendReclassExpirationEmail"
-    },
-    "AddToSqsQueue": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {
-        "FunctionName": "ldc-loan-review-lambda",
-        "Payload": {
-          "handlerType": "sqsHandler",
-          "requestNumber.$": "$.requestNumber",
-          "loanNumber.$": "$.loanNumber",
-          "loanDecision.$": "$.loanDecisionResult.loanDecision",
-          "attributes.$": "$.loanDecisionResult.attributes",
-          "dynamoDbTableName.$": "$.dynamoDbTableName"
-        }
-      },
-      "ResultPath": "$.sqsResult",
-      "Next": "CallVendPpa",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "Next": "LogAuditTrail"
-        }
-      ]
-    },
-    "SendReclassExpirationEmail": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {
-        "FunctionName": "ldc-loan-review-lambda",
-        "Payload": {
-          "handlerType": "emailNotification",
-          "notificationType": "ReclassExpired",
-          "loanNumber.$": "$.loanNumber",
-          "requestNumber.$": "$.requestNumber",
-          "templateName": "reclass-expired",
-          "dynamoDbTableName.$": "$.dynamoDbTableName"
-        }
-      },
-      "ResultPath": "$.emailResult",
-      "Next": "LogAuditTrail",
-      "Catch": [
-        {
-          "ErrorEquals": [
-            "States.ALL"
-          ],
-          "Next": "LogAuditTrail"
-        }
-      ]
+    "ReclassConfirmationAborted": {
+      "Type": "Fail",
+      "Error": "ReclassConfirmationAborted",
+      "Cause": "Reclass confirmation was aborted"
     },
     "LogAuditTrail": {
       "Type": "Task",
