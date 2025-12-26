@@ -4,7 +4,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
-import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.ssm.SsmClient;
 
 /**
@@ -35,14 +34,6 @@ public class AwsClientConfig {
     @Bean
     public SsmClient ssmClient() {
         return SsmClient.builder().build();
-    }
-
-    /**
-     * SQS (Simple Queue Service) client for reclass confirmations.
-     */
-    @Bean
-    public SqsClient sqsClient() {
-        return SqsClient.builder().build();
     }
 
 }

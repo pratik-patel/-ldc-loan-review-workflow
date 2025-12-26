@@ -3,6 +3,7 @@ package com.ldc.workflow.handlers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ldc.workflow.business.CompletionCriteriaChecker;
+import com.ldc.workflow.repository.WorkflowStateRepository;
 import com.ldc.workflow.types.LoanAttribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +28,12 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final CompletionCriteriaChecker completionCriteriaChecker;
+    private final WorkflowStateRepository workflowStateRepository;
 
-    public CompletionCriteriaHandler(CompletionCriteriaChecker completionCriteriaChecker) {
+    public CompletionCriteriaHandler(CompletionCriteriaChecker completionCriteriaChecker,
+            WorkflowStateRepository workflowStateRepository) {
         this.completionCriteriaChecker = completionCriteriaChecker;
+        this.workflowStateRepository = workflowStateRepository;
     }
 
     @Override
@@ -40,15 +44,28 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
             // Extract input fields
             String requestNumber = input.get("requestNumber").asText("unknown");
             String loanNumber = input.get("loanNumber").asText("unknown");
-            String loanDecision = input.has("loanDecision") && !input.get("loanDecision").isNull()
-                    ? input.get("loanDecision").asText()
-                    : null;
+            String executionId = input.has("executionId") ? input.get("executionId").asText()
+                    : "ldc-loan-review-" + requestNumber;
 
             logger.debug("Checking completion criteria for requestNumber: {}, loanNumber: {}",
                     requestNumber, loanNumber);
 
-            // Extract attributes from input
-            List<LoanAttribute> attributes = extractAttributes(input);
+            // Fetch from DynamoDB
+            java.util.Optional<com.ldc.workflow.types.WorkflowState> stateOpt = workflowStateRepository
+                    .findByRequestNumberAndLoanNumber(requestNumber, loanNumber);
+
+            if (stateOpt.isEmpty()) {
+                logger.warn("Workflow state not found for completion check. Request: {}", requestNumber);
+                // If state not found, we can't be complete.
+                return createSuccessResponse(requestNumber, loanNumber, false, "Workflow state not found");
+            }
+
+            com.ldc.workflow.types.WorkflowState state = stateOpt.get();
+            String loanDecision = state.getLoanDecision();
+            List<LoanAttribute> attributes = state.getAttributes();
+            if (attributes == null) {
+                attributes = new ArrayList<>();
+            }
 
             // Check completion criteria
             boolean isComplete = completionCriteriaChecker.isLoanDecisionComplete(
@@ -69,35 +86,6 @@ public class CompletionCriteriaHandler implements Function<JsonNode, JsonNode> {
             return createErrorResponse("unknown", "unknown",
                     "Internal error: " + e.getMessage());
         }
-    }
-
-    private List<LoanAttribute> extractAttributes(JsonNode input) {
-        List<LoanAttribute> attributes = new ArrayList<>();
-
-        if (!input.has("attributes") || input.get("attributes").isNull()) {
-            return attributes;
-        }
-
-        JsonNode attributesNode = input.get("attributes");
-        if (!attributesNode.isArray()) {
-            return attributes;
-        }
-
-        for (JsonNode attrNode : attributesNode) {
-            String name = attrNode.has("attributeName") ? attrNode.get("attributeName").asText() : null;
-            String decision = attrNode.has("attributeDecision") && !attrNode.get("attributeDecision").isNull()
-                    ? attrNode.get("attributeDecision").asText()
-                    : null;
-
-            if (name != null) {
-                LoanAttribute attr = new LoanAttribute();
-                attr.setAttributeName(name);
-                attr.setAttributeDecision(decision);
-                attributes.add(attr);
-            }
-        }
-
-        return attributes;
     }
 
     private JsonNode createSuccessResponse(String requestNumber, String loanNumber,

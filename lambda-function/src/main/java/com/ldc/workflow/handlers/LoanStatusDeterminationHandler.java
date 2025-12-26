@@ -16,7 +16,7 @@ import java.util.function.Function;
  * Lambda handler for loan status determination.
  * Determines the final loan status based on attribute decisions.
  * 
- * Input: JSON with requestNumber, loanNumber, attributes, executionId
+ * Input: JSON with requestNumber, loanNumber, attributes
  * Output: JSON with determined loan status
  */
 @Component("loanStatusDeterminationHandler")
@@ -26,9 +26,12 @@ public class LoanStatusDeterminationHandler implements Function<JsonNode, JsonNo
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final LoanStatusDeterminer loanStatusDeterminer;
+    private final com.ldc.workflow.repository.WorkflowStateRepository workflowStateRepository;
 
-    public LoanStatusDeterminationHandler(LoanStatusDeterminer loanStatusDeterminer) {
+    public LoanStatusDeterminationHandler(LoanStatusDeterminer loanStatusDeterminer,
+            com.ldc.workflow.repository.WorkflowStateRepository workflowStateRepository) {
         this.loanStatusDeterminer = loanStatusDeterminer;
+        this.workflowStateRepository = workflowStateRepository;
     }
 
     @Override
@@ -39,13 +42,23 @@ public class LoanStatusDeterminationHandler implements Function<JsonNode, JsonNo
             // Extract input fields
             String requestNumber = input.get("requestNumber").asText("unknown");
             String loanNumber = input.get("loanNumber").asText("unknown");
+            String executionId = input.has("executionId") ? input.get("executionId").asText()
+                    : "ldc-loan-review-" + requestNumber;
 
             logger.debug("Determining loan status for requestNumber: {}, loanNumber: {}",
                     requestNumber, loanNumber);
 
-            // Extract attributes from input
-            List<LoanAttribute> attributes = extractAttributes(input);
-            if (attributes.isEmpty()) {
+            // Fetch from DynamoDB
+            java.util.Optional<com.ldc.workflow.types.WorkflowState> stateOpt = workflowStateRepository
+                    .findByRequestNumberAndLoanNumber(requestNumber, loanNumber);
+
+            if (stateOpt.isEmpty()) {
+                logger.warn("Workflow state not found for status determination");
+                return createErrorResponse(requestNumber, loanNumber, "Workflow state not found");
+            }
+
+            List<LoanAttribute> attributes = stateOpt.get().getAttributes();
+            if (attributes == null || attributes.isEmpty()) {
                 logger.warn("No attributes found for loan status determination");
                 return createErrorResponse(requestNumber, loanNumber,
                         "No attributes found");
@@ -55,23 +68,8 @@ public class LoanStatusDeterminationHandler implements Function<JsonNode, JsonNo
             String loanStatus = loanStatusDeterminer.determineStatus(attributes);
             logger.info("Loan status determined: {} for requestNumber: {}", loanStatus, requestNumber);
 
-            // Req 10: Track State Transition
-            JsonNode historyNode = input.get("stateTransitionHistory");
-            List<com.ldc.workflow.types.StateTransition> history = new ArrayList<>();
-            if (historyNode != null && historyNode.isArray()) {
-                history = objectMapper.readValue(historyNode.traverse(),
-                        objectMapper.getTypeFactory().constructCollectionType(List.class,
-                                com.ldc.workflow.types.StateTransition.class));
-            }
-
-            history.add(new com.ldc.workflow.types.StateTransition(
-                    "DetermineLoanStatus",
-                    "System",
-                    java.time.Instant.now().toString(),
-                    java.time.Instant.now().toString()));
-
-            // Return success response with updated history
-            return createSuccessResponse(requestNumber, loanNumber, loanStatus, attributes, history);
+            // Return success response
+            return createSuccessResponse(requestNumber, loanNumber, loanStatus, attributes);
         } catch (Exception e) {
             logger.error("Error in loan status determination handler", e);
             return createErrorResponse("unknown", "unknown",
@@ -109,15 +107,13 @@ public class LoanStatusDeterminationHandler implements Function<JsonNode, JsonNo
     }
 
     private JsonNode createSuccessResponse(String requestNumber, String loanNumber,
-            String loanStatus, List<LoanAttribute> attributes,
-            List<com.ldc.workflow.types.StateTransition> history) {
+            String loanStatus, List<LoanAttribute> attributes) {
         return objectMapper.createObjectNode()
                 .put("success", true)
                 .put("requestNumber", requestNumber)
                 .put("loanNumber", loanNumber)
                 .put("status", loanStatus)
-                .put("attributeCount", attributes.size())
-                .set("stateTransitionHistory", objectMapper.valueToTree(history));
+                .put("attributeCount", attributes.size());
     }
 
     private JsonNode createErrorResponse(String requestNumber, String loanNumber, String error) {
